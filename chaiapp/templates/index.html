@@ -1,0 +1,113 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CHAI BOT 9000 👾</title>
+    <link rel="stylesheet" href="{% static 'styles.css' %}" />
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&family=Bangers&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="meme-container">
+        <!-- Meme Header -->
+        <div class="meme-header">
+            <h1>🚨 OFFICIAL CHAI POLICE SCANNER 🚨</h1>
+            <div class="meme-subtitle">"I diagnose your chai with..." machine</div>
+            <img src="https://i.imgur.com/JW5PEh5.png" class="meme-image" alt="Distracted boyfriend meme template">
+        </div>
+
+        <!-- Capture Section -->
+        <div class="meme-card" id="capture-section">
+            <div class="meme-card-title">📸 EVIDENCE COLLECTION PHASE 📸</div>
+            
+            <div class="video-wrapper">
+                <video id="video" autoplay playsinline></video>
+                <div class="meme-caption" style="bottom: -30px; right: 20px;">"When she says she doesn't like chai" 😱</div>
+            </div>
+
+            <div class="meme-buttons">
+                <button id="capture-button" class="meme-btn danger-btn">
+                    🕵️‍♂️ SNEAK PHOTO (SIDE)
+                </button>
+                <button id="upload-side-button" class="meme-btn">
+                    📁 UPLOAD CHAI SELFIE
+                </button>
+                <input type="file" id="file-input-side" accept="image/*" style="display:none;" />
+
+                <button id="capture-top-button" class="meme-btn danger-btn" style="display:none;">
+                    🕵️‍♂️ SNEAK PHOTO (TOP)
+                </button>
+                <button id="upload-top-button" class="meme-btn" style="display:none;">
+                    📁 UPLOAD BIRDS-EYE VIEW
+                </button>
+                <input type="file" id="file-input-top" accept="image/*" style="display:none;" />
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="result-section" class="meme-card" style="display:none;">
+            <div class="meme-card-title">🚨 CHAI CRIME SCENE REPORT 🚨</div>
+            
+            <div class="meme-verdict">
+                <div class="meme-score" id="score-circle" style="--rating: 0;">
+                    <span id="score-text">0%</span>
+                </div>
+                <div class="meme-rating" id="meme-rating-text">"Basic White Girl Status"</div>
+                <img src="https://i.imgur.com/6JqgXbG.png" id="meme-reaction" class="meme-reaction-img" alt="Disappointed reaction meme">
+            </div>
+
+            <div class="meme-details">
+                <div class="meme-fact">
+                    <h4>🔍 CHAI AUTOPSY FINDINGS:</h4>
+                    <p id="roast" class="meme-roast">"This chai weaker than my WiFi signal"</p>
+                    <div class="meme-meter">
+                        <div class="meme-meter-fill" id="roast-level"></div>
+                    </div>
+                </div>
+
+                <div class="meme-stats">
+                    <h4>📊 CHAI STATS (FOR NERDS):</h4>
+                    <ul>
+                        <li>💧 Chai Height: <strong id="chai-pct">--</strong> <span class="meme-comment">"That's what she said"</span></li>
+                        <li>☁️ Froth Height: <strong id="froth-pct">--</strong> <span class="meme-comment">"POV: Your hopes and dreams"</span></li>
+                        <li>📐 Ratio: <strong id="ratio-pct">--</strong> <span class="meme-comment">"Like my chances with her"</span></li>
+                        <li>🧪 Chai Volume: <strong id="chai-ml">--</strong> ml <span class="meme-comment">"Enough to drown my sorrows"</span></li>
+                        <li>🥄 Chai Teaspoons: <strong id="chai-tsp">--</strong> tsp <span class="meme-comment">"That's like 3 dad jokes worth"</span></li>
+                        <li>🫧 Bubble Count: <strong id="bubble-count">--</strong> <span class="meme-comment">"More than my social life"</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="meme-action">
+                <button id="analyze-again" class="meme-btn danger-btn">
+                    🔄 RUN IT BACK CHIEF
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading Screen -->
+        <div id="loading" class="meme-loading" style="display:none;">
+            <div class="meme-loading-content">
+                <div class="meme-spinner">🤔</div>
+                <h3>ANALYZING CHAI CRIME SCENE...</h3>
+                <p>"This taking longer than my character in Skyrim"</p>
+                <div class="meme-progress">
+                    <div class="meme-progress-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="meme-toast" style="display:none;"></div>
+    </div>
+
+    <!-- Meme Footer -->
+    <div class="meme-footer">
+        <p>"Not responsible for emotional damage caused by weak chai results"</p>
+        <p>© 2023 CHAI POLICE DEPARTMENT - "We have the receipts"</p>
+    </div>
+
+    <script src="{% static 'app.js' %}"></script>
+</body>
+</html>
