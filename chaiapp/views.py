@@ -1,439 +1,267 @@
-# chaiapp/views.py — final (Hough-based bubble counting, fixed 100 ml capacity)
 import cv2
 import numpy as np
 import base64
 import io
-from PIL import Image
-from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-from .models import ChaiResult
-import json
-import uuid
 import math
-import os
-from typing import Optional, Tuple
-
-# ---------------- CONFIG ----------------
+from PIL import Image
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+from django.shortcuts import render
+# Constants
 TEASPOON_ML = 5.0
-GLASS_CAPACITY_ML = 100.0   # fixed glass capacity (ml) as requested
-SIDE_MAX_DIM = 720          # downscale side image for speed (keeps height accuracy)
-TOP_MAX_DIM = 900           # keep top reasonably large for small bubble detection
-MIN_CUP_AREA_RATIO = 0.0008
-MAX_CUP_ASPECT_RATIO = 4.5
-DEBUG_SAVE = False
-DEBUG_DIR = "/mnt/data/chai_debug"
-os.makedirs(DEBUG_DIR, exist_ok=True)
-# ----------------------------------------
+GLASS_BOTTOM_DIAM_CM = 4.0
+GLASS_TOP_DIAM_CM = 5.0
+GLASS_HEIGHT_CM = 10.0
+MAX_DIMENSION = 800
 
 def home(request):
     return render(request, "index.html")
 
-
-def _resize_keep_aspect(img: np.ndarray, max_dim: int) -> np.ndarray:
-    h, w = img.shape[:2]
-    if max(h, w) <= max_dim:
-        return img
-    scale = float(max_dim) / float(max(h, w))
-    return cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-
-
-def decode_base64_image(data_url: str, downscale_max: Optional[int] = None) -> np.ndarray:
+def decode_image(data_url):
+    """Decode base64 image and resize if needed"""
     header, encoded = data_url.split(",", 1)
     image_data = base64.b64decode(encoded)
-    pil = Image.open(io.BytesIO(image_data)).convert("RGB")
-    img = cv2.cvtColor(np.array(pil), cv2.COLOR_RGB2BGR)
-    if downscale_max:
-        img = _resize_keep_aspect(img, downscale_max)
+    pil_img = Image.open(io.BytesIO(image_data)).convert("RGB")
+    img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+    
+    # Resize if too large
+    h, w = img.shape[:2]
+    if max(h, w) > MAX_DIMENSION:
+        scale = MAX_DIMENSION / max(h, w)
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), 
+                        interpolation=cv2.INTER_AREA)
     return img
 
-
-# ---- Cup detection (fast, robust) ----
-def find_cup_contour(side_img: np.ndarray) -> Optional[Tuple[int,int,int,int]]:
-    h, w = side_img.shape[:2]
-    gray = cv2.cvtColor(side_img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.equalizeHist(gray)
+def find_cup_contour(img):
+    """Find the cup contour using edge detection and contour analysis"""
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges = cv2.Canny(blurred, 50, 140)
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=1)
-
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    edges = cv2.Canny(blurred, 50, 150)
+    
+    # Morphological closing to connect edges
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
+    
+    # Find contours
+    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return None
-
-    img_area = float(h * w)
-    best = None
-    best_score = 0.0
+    
+    # Find the largest contour with reasonable aspect ratio
+    best_cnt = None
+    best_area = 0
+    img_area = img.shape[0] * img.shape[1]
+    
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        if area < img_area * MIN_CUP_AREA_RATIO:
+        if area < img_area * 0.01:  # Too small
             continue
-        x, y, cw, ch = cv2.boundingRect(cnt)
-        if cw <= 0 or ch <= 0:
-            continue
-        aspect = float(ch) / float(cw)
-        if aspect > MAX_CUP_ASPECT_RATIO or ch < 8:
-            continue
-        score = area * min(aspect, MAX_CUP_ASPECT_RATIO)
-        if score > best_score:
-            best_score = score
-            best = (x, y, cw, ch)
+            
+        x, y, w, h = cv2.boundingRect(cnt)
+        aspect_ratio = float(h) / w
+        
+        if 0.8 < aspect_ratio < 3.0 and area > best_area:
+            best_area = area
+            best_cnt = cnt
+    
+    return best_cnt
 
-    if best is None:
-        return None
-
-    x, y, cw, ch = best
-    pad_h = max(1, int(0.02 * ch))
-    pad_w = max(1, int(0.02 * cw))
-    x = max(0, x - pad_w)
-    y = max(0, y - pad_h)
-    cw = min(side_img.shape[1] - x, cw + 2 * pad_w)
-    ch = min(side_img.shape[0] - y, ch + 2 * pad_h)
-    return (x, y, cw, ch)
-
-
-# ---- Froth/Chai separation via LAB L-channel row analysis ----
-def segment_froth_and_chai_lab(side_img: np.ndarray, cup_rect: Optional[Tuple[int,int,int,int]]):
-    """
-    Returns (chai_px, froth_px, cup_px) where px values are from the ROI scale used.
-    We downscale the ROI vertically if it's very tall to speed up processing while keeping ratio integrity.
-    """
-    if cup_rect is None:
-        cup_px = side_img.shape[0]
-        return cup_px, 0, cup_px
-
-    x, y, cw, ch = cup_rect
-    roi = side_img[y:y+ch, x:x+cw]
-    if roi.size == 0:
-        cup_px = side_img.shape[0]
-        return cup_px, 0, cup_px
-
-    # downscale ROI vertical size if huge (keeps ratio)
-    MAX_ROI_H = 600
-    scale = 1.0
-    if roi.shape[0] > MAX_ROI_H:
-        scale = float(MAX_ROI_H) / float(roi.shape[0])
-        roi = cv2.resize(roi, (int(roi.shape[1] * scale), MAX_ROI_H), interpolation=cv2.INTER_AREA)
-    ch = roi.shape[0]
-
+def segment_chai_froth(img, cup_contour):
+    """Segment chai and froth layers using color and texture analysis"""
+    if cup_contour is None:
+        return img.shape[0], 0, img.shape[0], img  # Fallback values
+    
+    # Create mask for the cup
+    mask = np.zeros(img.shape[:2], dtype=np.uint8)
+    cv2.drawContours(mask, [cup_contour], -1, 255, -1)
+    
+    # Get ROI
+    x, y, w, h = cv2.boundingRect(cup_contour)
+    roi = img[y:y+h, x:x+w]
+    roi_mask = mask[y:y+h, x:x+w]
+    
+    # Convert to LAB color space for better color analysis
     lab = cv2.cvtColor(roi, cv2.COLOR_BGR2LAB)
-    L = lab[:, :, 0].astype(np.float32)  # 0..255
-    row_mean = L.mean(axis=1)
+    L = lab[:, :, 0]
+    
+    # Analyze lightness row by row
+    row_means = np.mean(L, axis=1)
+    smoothed = cv2.GaussianBlur(row_means.reshape(-1, 1), (21, 1), 0).flatten()
+    
+    # Find the froth boundary (where lightness changes most rapidly)
+    gradient = np.abs(np.gradient(smoothed))
+    froth_bottom = np.argmax(gradient[int(h*0.1):int(h*0.9)]) + int(h*0.1)
+    
+    # Validate froth detection
+    top_mean = np.mean(smoothed[:froth_bottom])
+    bottom_mean = np.mean(smoothed[froth_bottom:])
+    
+    if top_mean - bottom_mean < 5:  # Not enough contrast
+        froth_bottom = 0
+    
+    # Calculate heights
+    cup_height = h
+    froth_height = froth_bottom
+    chai_height = cup_height - froth_height
+    
+    # Create annotated image
+    annotated = roi.copy()
+    if froth_bottom > 0:
+        cv2.line(annotated, (0, froth_bottom), (w-1, froth_bottom), (0, 255, 0), 2)
+    
+    # Draw cup contour on original image for context
+    cv2.drawContours(img, [cup_contour], -1, (255, 0, 0), 2)
+    img[y:y+h, x:x+w] = annotated
+    
+    return chai_height, froth_height, cup_height, img
 
-    # smoothing kernel proportional to height but limited
-    k = max(5, min(31, (ch // 30) | 1))
-    smooth = cv2.GaussianBlur(row_mean.reshape(-1, 1), (k, 1), 0).flatten()
+def frustum_volume(height, bottom_diam, top_diam):
+    """Calculate volume of a frustum (tapered cylinder)"""
+    if height <= 0:
+        return 0.0
+    return (math.pi * height / 12.0) * (bottom_diam**2 + bottom_diam*top_diam + top_diam**2)
 
-    deriv = np.diff(smooth)  # length ch-1
-    froth_bottom_row = None
-    if deriv.size > 0:
-        start = max(2, int(0.03 * ch))
-        end = max(start+1, deriv.size - max(2, int(0.03 * ch)))
-        local = deriv[start:end]
-        if local.size:
-            rel_min = int(np.argmin(local))
-            idx = rel_min + start
-            if deriv[idx] < -1.5:
-                froth_bottom_row = idx + 1  # +1 due to diff shift
-
-    # fallback heuristic if derivative fails
-    if froth_bottom_row is None:
-        top_blk = smooth[:max(4, int(0.06*ch))]
-        bottom_blk = smooth[max(1, ch - max(6, int(0.06*ch))):]
-        if top_blk.size and bottom_blk.size:
-            if float(top_blk.mean()) - float(bottom_blk.mean()) > 2.5:
-                pivot = float(top_blk.mean()) - (float(top_blk.mean()) - float(bottom_blk.mean())) * 0.45
-                below = np.where(smooth < pivot)[0]
-                if below.size:
-                    froth_bottom_row = int(below[0])
-
-    if froth_bottom_row is None or froth_bottom_row <= 0:
-        froth_px = 0
-        chai_px = ch
-        cup_px = ch
-    else:
-        froth_px = int(max(0, min(ch, froth_bottom_row)))
-        chai_px = int(max(0, min(ch, ch - froth_px)))
-        cup_px = ch
-
-    # if debugging, save annotated ROI
-    if DEBUG_SAVE:
-        vis = roi.copy()
-        cv2.line(vis, (0, froth_px), (vis.shape[1]-1, froth_px), (0,0,255), 2)
-        fname = os.path.join(DEBUG_DIR, f"side_debug_{uuid.uuid4().hex[:8]}.jpg")
-        cv2.imwrite(fname, vis)
-
-    # Note: caller should use cup_px and chai_px/froth_px from this same ROI scale to compute volumes.
-    return chai_px, froth_px, cup_px
-
-
-# ---- Fixed-capacity volume calculation (100 ml) ----
-def estimate_volumes_fixed_capacity(cup_px: int, chai_px: int, froth_px: int, capacity_ml: float = GLASS_CAPACITY_ML):
+def calculate_volumes(chai_px, froth_px, cup_px):
+    """Calculate volumes based on pixel measurements"""
     if cup_px <= 0:
         return 0.0, 0.0, None, 0.0, 0.0
+    
+    px_to_cm = GLASS_HEIGHT_CM / cup_px
+    chai_cm = chai_px * px_to_cm
+    froth_cm = froth_px * px_to_cm
+    
+    # Total cup volume
+    total_ml = frustum_volume(GLASS_HEIGHT_CM, GLASS_BOTTOM_DIAM_CM, GLASS_TOP_DIAM_CM)
+    
+    # Chai volume (frustum from bottom to liquid level)
+    if chai_cm >= GLASS_HEIGHT_CM:
+        chai_ml = total_ml
+    else:
+        # Calculate diameter at liquid level
+        D_liquid = GLASS_BOTTOM_DIAM_CM + (GLASS_TOP_DIAM_CM - GLASS_BOTTOM_DIAM_CM) * (chai_cm / GLASS_HEIGHT_CM)
+        chai_ml = frustum_volume(chai_cm, GLASS_BOTTOM_DIAM_CM, D_liquid)
+    
+    # Froth volume is the remaining space
+    froth_ml = max(0.0, total_ml - chai_ml)
+    
+    # Calculate percentages and ratio
+    chai_pct = (chai_px / cup_px) * 100
+    froth_pct = (froth_px / cup_px) * 100
+    ratio = chai_ml / froth_ml if froth_ml > 0 else None
+    
+    # Teaspoons
+    chai_tsp = chai_ml / TEASPOON_ML
+    
+    return chai_pct, froth_pct, ratio, chai_ml, chai_tsp, froth_ml
 
-    chai_pct = round((float(chai_px) / float(cup_px)) * 100.0, 2)
-    froth_pct = round((float(froth_px) / float(cup_px)) * 100.0, 2)
-    px_to_ml = float(capacity_ml) / float(cup_px)
-    chai_ml = float(chai_px) * px_to_ml
-    froth_ml = float(froth_px) * px_to_ml
-
-    ratio_val = round(float(chai_ml) / float(froth_ml), 2) if froth_ml > 1e-6 else None
-    chai_teaspoons = round(float(chai_ml) / TEASPOON_ML, 2)
-
-    # round ml to 2 decimals
-    chai_ml = round(float(chai_ml), 2)
-    froth_ml = round(float(froth_ml), 2)
-
-    return chai_pct, froth_pct, ratio_val, chai_ml, chai_teaspoons
-
-
-# ---- Rim mask helper (fast) ----
-def detect_rim_mask(top_img: np.ndarray) -> Optional[np.ndarray]:
-    """
-    Try to detect rim with HoughCircles tuned for rim size. If found, make an interior mask.
-    Else fallback to finding the largest near-circular contour.
-    """
-    gray = cv2.cvtColor(top_img, cv2.COLOR_BGR2GRAY)
-    h, w = gray.shape[:2]
-    blur = cv2.medianBlur(gray, 7)
-
-    # Hough for rim (rim is large)
-    try:
-        circles = cv2.HoughCircles(blur, cv2.HOUGH_GRADIENT, dp=1.0,
-                                   minDist=min(w,h)/8,
-                                   param1=100, param2=30,
-                                   minRadius=int(min(w,h)*0.18),
-                                   maxRadius=int(min(w,h)*0.49))
-    except Exception:
-        circles = None
-
-    if circles is not None and len(circles[0]) > 0:
-        c = circles[0][0]
-        cx, cy, r = int(c[0]), int(c[1]), int(c[2])
-        mask = np.zeros((h, w), dtype=np.uint8)
-        cv2.circle(mask, (cx, cy), int(r * 0.95), 255, -1)
-        if DEBUG_SAVE:
-            vis = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-            cv2.circle(vis, (cx, cy), r, (0,255,0), 2)
-            fname = os.path.join(DEBUG_DIR, f"top_rim_{uuid.uuid4().hex[:8]}.jpg")
-            cv2.imwrite(fname, vis)
-        return mask
-
-    # Fallback contour method
-    _, thr = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    contours, _ = cv2.findContours(thr, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
-        return None
-    best = max(contours, key=cv2.contourArea)
-    mask = np.zeros((h, w), dtype=np.uint8)
-    cv2.drawContours(mask, [best], -1, 255, -1)
-    # don't erode too much; keep near-rim bubbles
-    if DEBUG_SAVE:
-        vis = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-        cv2.drawContours(vis, [best], -1, (0,255,0), 2)
-        fname = os.path.join(DEBUG_DIR, f"top_rim_cont_{uuid.uuid4().hex[:8]}.jpg")
-        cv2.imwrite(fname, vis)
-    return mask
-
-
-# ---- Hough-based bubble counting (primary) ----
-def count_bubbles_hough(top_img: np.ndarray) -> int:
-    """
-    Primary bubble detector using HoughCircles on a well-preprocessed image, restricted by rim mask.
-    Dedupe overlapping circles and filter by reasonable radius range.
-    """
-    img = _resize_keep_aspect(top_img, TOP_MAX_DIM)
-    h, w = img.shape[:2]
-
-    # Mask to interior of rim
-    mask = detect_rim_mask(img)
-    if mask is None:
-        # fallback to center circle mask
-        cx, cy = w//2, h//2
-        r = int(min(w, h) * 0.45)
-        mask = np.zeros((h, w), dtype=np.uint8)
-        cv2.circle(mask, (cx, cy), r, 255, -1)
-
-    # Preprocess for Hough: equalize and median blur (Hough works better without extreme binary morph)
+def count_bubbles(img):
+    """Count bubbles in the froth using Hough Circle Transform"""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    eq = cv2.equalizeHist(gray)
-    blur = cv2.medianBlur(eq, 5)
-
-    # Hough parameters tuned for small bubbles:
-    min_dist = max(6, int(min(w, h) * 0.03))   # minimum distance between centers
-    min_radius = 2
-    max_radius = max(6, int(min(w, h) * 0.12))  # allow up to ~12% of min-dim
-
-    try:
-        circles = cv2.HoughCircles(blur, cv2.HOUGH_GRADIENT, dp=1.2,
-                                   minDist=min_dist,
-                                   param1=50, param2=16,  # param2 lower -> more sensitive
-                                   minRadius=min_radius, maxRadius=max_radius)
-    except Exception:
-        circles = None
-
-    kept = []
-    if circles is not None:
-        for c in circles[0]:
-            cx, cy, r = int(round(c[0])), int(round(c[1])), int(round(c[2]))
-            # center must be inside mask
-            if cx < 0 or cy < 0 or cx >= w or cy >= h:
-                continue
-            if mask[cy, cx] == 0:
-                continue
-            # radius plausibility check
-            if r < min_radius or r > max_radius:
-                continue
-            # dedupe by proximity (keep larger circle if overlap)
-            dup = False
-            for i, (pcx, pcy, pr) in enumerate(kept):
-                if math.hypot(cx - pcx, cy - pcy) < max(3, 0.6 * (r + pr)):
-                    # overlap - keep the one with larger radius confidence
-                    if r > pr:
-                        kept[i] = (cx, cy, r)
-                    dup = True
-                    break
-            if not dup:
-                kept.append((cx, cy, r))
-
-    # If Hough found very few or none, try fast contour fallback (still masked)
-    if len(kept) < 3:
-        # adaptive fallback: threshold masked image and look for circular-ish contours
-        masked = cv2.bitwise_and(eq, eq, mask=mask)
-        blur2 = cv2.GaussianBlur(masked, (5,5), 0)
-        _, thr = cv2.threshold(blur2, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
-        clean = cv2.morphologyEx(thr, cv2.MORPH_OPEN, kernel, iterations=1)
-        clean = cv2.morphologyEx(clean, cv2.MORPH_CLOSE, kernel, iterations=1)
-        contours, _ = cv2.findContours(clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            if area < 8:
-                continue
-            x, y, cw, ch = cv2.boundingRect(cnt)
-            if cw == 0 or ch == 0:
-                continue
-            r_est = max(cw, ch)/2.0
-            if r_est < min_radius or r_est > max_radius:
-                continue
-            per = cv2.arcLength(cnt, True)
-            if per <= 0:
-                continue
-            circ = 4.0 * math.pi * (area / (per * per))
-            if circ < 0.18:  # allow some irregularity
-                continue
-            M = cv2.moments(cnt)
-            if M.get("m00",0) == 0:
-                continue
-            cx = int(M["m10"]/M["m00"])
-            cy = int(M["m01"]/M["m00"])
-            if mask[cy, cx] == 0:
-                continue
-            # dedupe vs kept
-            dup = False
-            for i, (pcx, pcy, pr) in enumerate(kept):
-                if math.hypot(cx - pcx, cy - pcy) < max(3, 0.6 * (r_est + pr)):
-                    dup = True
-                    break
-            if not dup:
-                kept.append((cx, cy, r_est))
-
-    # final count
-    bubble_count = len(kept)
-
-    # debug visualization
-    if DEBUG_SAVE:
-        vis = cv2.cvtColor(eq, cv2.COLOR_GRAY2BGR)
-        for (cx, cy, r) in kept:
-            cv2.circle(vis, (int(cx), int(cy)), int(max(2, round(r))), (0,255,0), 2)
-        # draw mask boundary overlay
-        contours_mask, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cv2.drawContours(vis, contours_mask, -1, (255,0,0), 2)
-        fname = os.path.join(DEBUG_DIR, f"top_bubbles_{uuid.uuid4().hex[:8]}.jpg")
-        cv2.imwrite(fname, vis)
-
-    return int(bubble_count)
-
-
-# ---- Roast generation ----
-def generate_roast(chai_pct: float, froth_pct: float, ratio_val: Optional[float]) -> str:
-    if (ratio_val is None) and (chai_pct == 0.0):
-        return "Where did the chai go? Empty glass?"
-    if ratio_val is None:
-        return "Very foamy (or no froth) — odd."
-    if ratio_val > 30.0:
-        return "All chai, no froth — where's the foam?"
-    if ratio_val < 1.0:
-        return "That's a foam party. Is the chai shy?"
-    if 0.95 <= ratio_val <= 1.5:
-        return "You're the chosen one with that perfect chai!"
-    return "Decent brew — not a crime, not a miracle."
-
-
-# ---- API endpoint ----
-@csrf_exempt
-def upload_images(request):
-    if request.method != "POST":
-        return JsonResponse({"error": "POST required"}, status=400)
-
-    try:
-        payload = json.loads(request.body)
-    except Exception:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-    if "side_view" not in payload or "top_view" not in payload:
-        return JsonResponse({"error": "side_view and top_view required"}, status=400)
-
-    try:
-        side_img = decode_base64_image(payload["side_view"], downscale_max=SIDE_MAX_DIM)
-        top_img = decode_base64_image(payload["top_view"], downscale_max=TOP_MAX_DIM)
-    except Exception as e:
-        return JsonResponse({"error": f"Failed to decode images: {e}"}, status=400)
-
-    # detect cup on side view
-    cup_rect = find_cup_contour(side_img)
-    if cup_rect is None:
-        # fallback: use full image as cup rect
-        h, w = side_img.shape[:2]
-        cup_rect = (0, 0, w, h)
-
-    # segment
-    chai_px, froth_px, cup_px = segment_froth_and_chai_lab(side_img, cup_rect)
-
-    # estimate volumes using fixed 100 ml capacity
-    chai_pct, froth_pct, ratio_val, chai_ml, chai_tsp = estimate_volumes_fixed_capacity(
-        cup_px, chai_px, froth_px, capacity_ml=GLASS_CAPACITY_ML
+    blurred = cv2.medianBlur(gray, 5)
+    
+    # Detect circles (bubbles)
+    circles = cv2.HoughCircles(
+        blurred,
+        cv2.HOUGH_GRADIENT,
+        dp=1,
+        minDist=10,
+        param1=50,
+        param2=20,
+        minRadius=5,
+        maxRadius=30
     )
+    
+    annotated = img.copy()
+    bubble_count = 0
+    
+    if circles is not None:
+        circles = np.uint16(np.around(circles))
+        
+        # Filter and count valid circles
+        for i in circles[0, :]:
+            # Only count circles in the central area (avoid edges)
+            if (i[0] > 50 and i[0] < img.shape[1]-50 and 
+                i[1] > 50 and i[1] < img.shape[0]-50):
+                cv2.circle(annotated, (i[0], i[1]), i[2], (0, 255, 0), 2)
+                bubble_count += 1
+    
+    return bubble_count, annotated
 
-    # bubble count using Hough
-    bubble_count = count_bubbles_hough(top_img)
+def generate_roast(chai_pct, froth_pct, ratio):
+    """Generate a fun roast based on the chai characteristics"""
+    if ratio is None and chai_pct > 0:
+        return "Pure chai - no froth to be found!"
+    if ratio is None and chai_pct == 0:
+        return "Empty cup detected - where's the chai?"
+    if ratio is not None and ratio > 10:
+        return "Strong chai with just a whisper of froth"
+    if ratio is not None and ratio < 0.5:
+        return "More froth than chai - are you sure this isn't a cappuccino?"
+    return "Perfectly balanced chai - excellent brew!"
 
-    # roast
-    roast = generate_roast(chai_pct, froth_pct, ratio_val)
-
-    # save result (don't fail API on DB error)
+@csrf_exempt
+def analyze_chai(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=400)
+    
     try:
-        ChaiResult.objects.create(
-            device_uuid=request.COOKIES.get("device_uuid") or str(uuid.uuid4()),
-            chai_height=chai_pct,
-            froth_height=froth_pct,
-            chai_to_froth_ratio=(ratio_val if ratio_val is not None else 0.0),
-            bubble_count=bubble_count,
-            roast=roast
+        data = json.loads(request.body)
+        side_view = data.get('side_view')
+        top_view = data.get('top_view')
+        if not side_view or not top_view:
+            return JsonResponse({'error': 'Both side and top views required'}, status=400)
+        
+        # Process side view for volume estimation
+        side_img = decode_image(side_view)
+        cup_contour = find_cup_contour(side_img)
+        chai_px, froth_px, cup_px, annotated_side = segment_chai_froth(side_img, cup_contour)
+        
+        # Calculate volumes and metrics
+        chai_pct, froth_pct, ratio, chai_ml, chai_tsp, froth_ml = calculate_volumes(
+            chai_px, froth_px, cup_px
         )
-    except Exception:
-        pass
-
-    resp = {
-        "chai_height": chai_pct,
-        "froth_height": froth_pct,
-        "ratio": ratio_val,  # numeric ratio or null
-        "chai_ml": chai_ml,
-        "chai_teaspoons": chai_tsp,
-        "bubble_count": bubble_count,
-        "roast": roast
-    }
-    return JsonResponse(resp)
+        
+        # Process top view for bubble counting
+        top_img = decode_image(top_view)
+        bubble_count, annotated_top = count_bubbles(top_img)
+        
+        # Generate roast comment
+        roast = generate_roast(chai_pct, froth_pct, ratio)
+        
+        # Convert annotated images to base64
+        _, side_encoded = cv2.imencode('.jpg', annotated_side)
+        side_base64 = base64.b64encode(side_encoded).decode('utf-8')
+        
+        _, top_encoded = cv2.imencode('.jpg', annotated_top)
+        top_base64 = base64.b64encode(top_encoded).decode('utf-8')
+        
+        # Prepare response
+        response = {
+            'chai_height': round(chai_pct, 2),
+            'froth_height': round(froth_pct, 2),
+            'ratio': round(ratio, 2) if ratio is not None else None,
+            'chai_ml': round(chai_ml, 2),
+            'chai_teaspoons': round(chai_tsp, 2),
+            'froth_ml': round(froth_ml, 2),
+            'bubble_count': bubble_count,
+            'roast': roast,
+            'annotated_side': 'data:image/jpeg;base64,' + side_base64,
+            'annotated_top': 'data:image/jpeg;base64,' + top_base64
+        }
+        
+        # Log detailed results to console (for developer)
+        print("\n=== Chai Analysis Results ===")
+        print(f"Chai Height: {response['chai_height']}%")
+        print(f"Froth Height: {response['froth_height']}%")
+        print(f"Ratio (Chai:Froth): {response['ratio'] or 'N/A'}")
+        print(f"Chai Volume: {response['chai_ml']} ml ({response['chai_teaspoons']} tsp)")
+        print(f"Froth Volume: {response['froth_ml']} ml")
+        print(f"Bubble Count: {response['bubble_count']}")
+        print(f"Roast: {response['roast']}")
+        
+        return JsonResponse(response)
+        
+    except Exception as e:
+        print(f"Error processing image: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)

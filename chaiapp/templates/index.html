@@ -1,113 +1,391 @@
-{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>CHAI BOT 9000 👾</title>
-    <link rel="stylesheet" href="{% static 'styles.css' %}" />
-    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&family=Bangers&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chai-O-Meter</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap">
+    <style>
+        :root {
+            --primary: #F59E0B;
+            --primary-dark: #D97706;
+            --secondary: #10B981;
+            --dark: #1F2937;
+            --light: #F3F4F6;
+            --white: #FFFFFF;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--light);
+            color: var(--dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .tagline {
+            color: var(--dark);
+            opacity: 0.8;
+            font-size: 1.1rem;
+        }
+        
+        .card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+            flex: 1;
+        }
+        
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            gap: 8px;
+        }
+        
+        .step {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        
+        .step-active {
+            background: var(--primary);
+            color: var(--white);
+        }
+        
+        .step-inactive {
+            background: var(--light);
+            color: var(--dark);
+            opacity: 0.5;
+        }
+        
+        .step-completed {
+            background: var(--secondary);
+            color: var(--white);
+        }
+        
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto 1.5rem;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        #video {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: var(--light);
+        }
+        
+        .guide-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+        
+        .guide-circle {
+            width: 70%;
+            height: 70%;
+            border: 2px dashed var(--primary);
+            border-radius: 50%;
+            opacity: 0.6;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: var(--white);
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+        
+        .btn-outline:hover {
+            background: rgba(245, 158, 11, 0.1);
+        }
+        
+        .btn-secondary {
+            background: var(--secondary);
+            color: var(--white);
+        }
+        
+        .btn-secondary:hover {
+            background: #0ea371;
+        }
+        
+        #side-section, #top-section {
+            display: none;
+        }
+        
+        #result-section {
+            display: none;
+        }
+        
+        .result-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        
+        .result-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .result-value {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin: 0.5rem 0;
+        }
+        
+        .result-label {
+            font-size: 1rem;
+            color: var(--dark);
+            opacity: 0.8;
+        }
+        
+        .image-preview {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .preview-container {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .preview-image {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(245, 158, 11, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 50px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+        
+        .instructions {
+            text-align: center;
+            margin-top: 1rem;
+            color: var(--dark);
+            opacity: 0.7;
+        }
+        
+        @media (max-width: 768px) {
+            .result-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="meme-container">
-        <!-- Meme Header -->
-        <div class="meme-header">
-            <h1>🚨 OFFICIAL CHAI POLICE SCANNER 🚨</h1>
-            <div class="meme-subtitle">"I diagnose your chai with..." machine</div>
-            <img src="https://i.imgur.com/JW5PEh5.png" class="meme-image" alt="Distracted boyfriend meme template">
+    <div class="container">
+        <header>
+            <h1>Chai-O-Meter</h1>
+            <p class="tagline">Measure your chai like a pro</p>
+        </header>
+        
+        <div class="step-indicator">
+            <div id="step1" class="step step-active">1</div>
+            <div id="step2" class="step step-inactive">2</div>
         </div>
-
-        <!-- Capture Section -->
-        <div class="meme-card" id="capture-section">
-            <div class="meme-card-title">📸 EVIDENCE COLLECTION PHASE 📸</div>
+        
+        <div class="card" id="capture-section">
+            <h2 style="text-align: center; color: var(--primary); margin-bottom: 1rem;">Capture Side View</h2>
             
-            <div class="video-wrapper">
+            <div class="video-container">
                 <video id="video" autoplay playsinline></video>
-                <div class="meme-caption" style="bottom: -30px; right: 20px;">"When she says she doesn't like chai" 😱</div>
+                <div class="guide-overlay">
+                    <div class="guide-circle"></div>
+                </div>
             </div>
-
-            <div class="meme-buttons">
-                <button id="capture-button" class="meme-btn danger-btn">
-                    🕵️‍♂️ SNEAK PHOTO (SIDE)
-                </button>
-                <button id="upload-side-button" class="meme-btn">
-                    📁 UPLOAD CHAI SELFIE
-                </button>
-                <input type="file" id="file-input-side" accept="image/*" style="display:none;" />
-
-                <button id="capture-top-button" class="meme-btn danger-btn" style="display:none;">
-                    🕵️‍♂️ SNEAK PHOTO (TOP)
-                </button>
-                <button id="upload-top-button" class="meme-btn" style="display:none;">
-                    📁 UPLOAD BIRDS-EYE VIEW
-                </button>
-                <input type="file" id="file-input-top" accept="image/*" style="display:none;" />
-            </div>
-        </div>
-
-        <!-- Results Section -->
-        <div id="result-section" class="meme-card" style="display:none;">
-            <div class="meme-card-title">🚨 CHAI CRIME SCENE REPORT 🚨</div>
             
-            <div class="meme-verdict">
-                <div class="meme-score" id="score-circle" style="--rating: 0;">
-                    <span id="score-text">0%</span>
-                </div>
-                <div class="meme-rating" id="meme-rating-text">"Basic White Girl Status"</div>
-                <img src="https://i.imgur.com/6JqgXbG.png" id="meme-reaction" class="meme-reaction-img" alt="Disappointed reaction meme">
+            <div class="button-group">
+                <button id="capture-side-button" class="btn btn-primary">Capture</button>
+                <button id="upload-side-button" class="btn btn-outline">Upload</button>
+                <input type="file" id="file-input-side" accept="image/*" style="display:none;">
             </div>
-
-            <div class="meme-details">
-                <div class="meme-fact">
-                    <h4>🔍 CHAI AUTOPSY FINDINGS:</h4>
-                    <p id="roast" class="meme-roast">"This chai weaker than my WiFi signal"</p>
-                    <div class="meme-meter">
-                        <div class="meme-meter-fill" id="roast-level"></div>
-                    </div>
-                </div>
-
-                <div class="meme-stats">
-                    <h4>📊 CHAI STATS (FOR NERDS):</h4>
-                    <ul>
-                        <li>💧 Chai Height: <strong id="chai-pct">--</strong> <span class="meme-comment">"That's what she said"</span></li>
-                        <li>☁️ Froth Height: <strong id="froth-pct">--</strong> <span class="meme-comment">"POV: Your hopes and dreams"</span></li>
-                        <li>📐 Ratio: <strong id="ratio-pct">--</strong> <span class="meme-comment">"Like my chances with her"</span></li>
-                        <li>🧪 Chai Volume: <strong id="chai-ml">--</strong> ml <span class="meme-comment">"Enough to drown my sorrows"</span></li>
-                        <li>🥄 Chai Teaspoons: <strong id="chai-tsp">--</strong> tsp <span class="meme-comment">"That's like 3 dad jokes worth"</span></li>
-                        <li>🫧 Bubble Count: <strong id="bubble-count">--</strong> <span class="meme-comment">"More than my social life"</span></li>
-                    </ul>
+            
+            <p class="instructions">Take a clear side view photo of your chai glass</p>
+        </div>
+        
+        <div class="card" id="top-section">
+            <h2 style="text-align: center; color: var(--primary); margin-bottom: 1rem;">Capture Top View</h2>
+            
+            <div class="video-container">
+                <video id="video-top" autoplay playsinline></video>
+                <div class="guide-overlay">
+                    <div class="guide-circle"></div>
                 </div>
             </div>
-
-            <div class="meme-action">
-                <button id="analyze-again" class="meme-btn danger-btn">
-                    🔄 RUN IT BACK CHIEF
-                </button>
+            
+            <div class="button-group">
+                <button id="capture-top-button" class="btn btn-primary">Capture</button>
+                <button id="upload-top-button" class="btn btn-outline">Upload</button>
+                <input type="file" id="file-input-top" accept="image/*" style="display:none;">
+            </div>
+            
+            <p class="instructions">Take a clear top-down photo of your chai froth</p>
+        </div>
+        
+        <div class="card" id="result-section">
+            <h2 style="text-align: center; color: var(--primary); margin-bottom: 1rem;">Your Chai Analysis</h2>
+            
+            <div class="result-grid">
+                <div class="result-card">
+                    <div class="result-value" id="chai-tsp">--</div>
+                    <div class="result-label">Teaspoons of Chai</div>
+                </div>
+                
+                <div class="result-card">
+                    <div class="result-value" id="bubble-count">--</div>
+                    <div class="result-label">Bubbles Detected</div>
+                </div>
+            </div>
+            
+            <div class="image-preview">
+                <div class="preview-container">
+                    <img id="side-preview" class="preview-image" alt="Side view analysis">
+                </div>
+                <div class="preview-container">
+                    <img id="top-preview" class="preview-image" alt="Top view analysis">
+                </div>
+            </div>
+            
+            <div class="button-group" style="margin-top: 2rem;">
+                <button id="analyze-again" class="btn btn-primary">Analyze Another Cup</button>
             </div>
         </div>
-
-        <!-- Loading Screen -->
-        <div id="loading" class="meme-loading" style="display:none;">
-            <div class="meme-loading-content">
-                <div class="meme-spinner">🤔</div>
-                <h3>ANALYZING CHAI CRIME SCENE...</h3>
-                <p>"This taking longer than my character in Skyrim"</p>
-                <div class="meme-progress">
-                    <div class="meme-progress-fill"></div>
-                </div>
-            </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Analyzing your chai...</p>
         </div>
-
-        <!-- Toast Notification -->
-        <div id="toast" class="meme-toast" style="display:none;"></div>
     </div>
-
-    <!-- Meme Footer -->
-    <div class="meme-footer">
-        <p>"Not responsible for emotional damage caused by weak chai results"</p>
-        <p>© 2023 CHAI POLICE DEPARTMENT - "We have the receipts"</p>
-    </div>
-
-    <script src="{% static 'app.js' %}"></script>
+    
+    <div class="toast" id="toast"></div>
+    
+    <script src="static/app.js"></script>
 </body>
 </html>
