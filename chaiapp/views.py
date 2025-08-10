@@ -3,11 +3,13 @@ import numpy as np
 import base64
 import io
 import math
+import random
 from PIL import Image
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.shortcuts import render
+
 # Constants
 TEASPOON_ML = 5.0
 GLASS_BOTTOM_DIAM_CM = 4.0
@@ -23,6 +25,10 @@ def decode_image(data_url):
     header, encoded = data_url.split(",", 1)
     image_data = base64.b64decode(encoded)
     pil_img = Image.open(io.BytesIO(image_data)).convert("RGB")
+    # Increase sharpness by 50%
+    from PIL import ImageEnhance
+    enhancer = ImageEnhance.Sharpness(pil_img)
+    pil_img = enhancer.enhance(25)
     img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
     
     # Resize if too large
@@ -105,10 +111,14 @@ def segment_chai_froth(img, cup_contour):
     froth_height = froth_bottom
     chai_height = cup_height - froth_height
     
-    # Create annotated image
     annotated = roi.copy()
+    
+    # Draw bounding boxes
     if froth_bottom > 0:
-        cv2.line(annotated, (0, froth_bottom), (w-1, froth_bottom), (0, 255, 0), 2)
+        # Froth box (blue)
+        cv2.rectangle(annotated, (0, 0), (w-1, froth_bottom), (255, 0, 0), 2)
+        # Chai box (green)
+        cv2.rectangle(annotated, (0, froth_bottom), (w-1, h-1), (0, 255, 0), 2)
     
     # Draw cup contour on original image for context
     cv2.drawContours(img, [cup_contour], -1, (255, 0, 0), 2)
@@ -189,16 +199,80 @@ def count_bubbles(img):
     return bubble_count, annotated
 
 def generate_roast(chai_pct, froth_pct, ratio):
-    """Generate a fun roast based on the chai characteristics"""
+    """Generate a fun roast based on the chai characteristics with random witty responses"""
+    roasts = {
+    "pure_chai": [
+        "This chai is so pure, monks might meditate on it.",
+        "No froth at all — this cup means business.",
+        "Looks like you skipped the froth department entirely.",
+        "Froth? Never heard of her.",
+        "As naked as chai gets.",
+        "A minimalist masterpiece — just chai, no nonsense.",
+        "This is chai stripped down to its soul.",
+        "Froth-phobic much?",
+        "This chai could pass airport security without a froth check.",
+        "The Sahara has more bubbles than this."
+    ],
+    "empty": [
+        "Congratulations, you’ve invented invisible chai.",
+        "Air-flavored chai? Bold choice.",
+        "I think you just sent me a picture of disappointment.",
+        "Was the chai stolen before the photo?",
+        "This cup has trust issues — nothing inside.",
+        "The emptiness speaks louder than words.",
+        "Cup is ready... for literally anything but chai.",
+        "So empty, it echoes.",
+        "Not a chai, just a ceramic cry for help.",
+        "The only thing brewing here is sadness."
+    ],
+    "chai_heavy": [
+        "This chai could knock out a caffeine rookie.",
+        "Froth is scared to exist here.",
+        "Looks like a chai ocean with a froth island.",
+        "Strong enough to wake your ancestors.",
+        "You clearly don’t believe in balance.",
+        "This chai skipped yoga class.",
+        "Liquid dominance achieved.",
+        "Your chai is basically flexing right now.",
+        "The froth drowned before it could fight.",
+        "Chai here, chai there, chai everywhere."
+    ],
+    "froth_heavy": [
+        "This isn’t chai, it’s a bubble bath.",
+        "More froth than chai — Starbucks would be proud.",
+        "I’ve seen lattes with more chai than this.",
+        "You’re one step away from whipped cream.",
+        "Chai drowned under a froth tsunami.",
+        "Bubble kingdom, chai peasants.",
+        "This is a cappuccino cosplay.",
+        "Froth domination: 100%.",
+        "The chai is playing hide-and-seek under there.",
+        "Did you milk the clouds for this?"
+    ],
+    "balanced": [
+        "Balanced like a Zen master’s tea.",
+        "This is chai harmony in a cup.",
+        "If chai could win beauty contests, this would.",
+        "Perfect ratio — a rare sight indeed.",
+        "Chai gods are pleased with you.",
+        "Michelangelo would paint this cup.",
+        "As symmetrical as a monk’s garden.",
+        "Your chai has achieved inner peace.",
+        "Drink it before the UN declares it a heritage.",
+        "Balanced enough to inspire poetry."
+    ]
+}
+
+    
     if ratio is None and chai_pct > 0:
-        return "Pure chai - no froth to be found!"
+        return random.choice(roasts["pure_chai"])
     if ratio is None and chai_pct == 0:
-        return "Empty cup detected - where's the chai?"
+        return random.choice(roasts["empty"])
     if ratio is not None and ratio > 10:
-        return "Strong chai with just a whisper of froth"
+        return random.choice(roasts["chai_heavy"])
     if ratio is not None and ratio < 0.5:
-        return "More froth than chai - are you sure this isn't a cappuccino?"
-    return "Perfectly balanced chai - excellent brew!"
+        return random.choice(roasts["froth_heavy"])
+    return random.choice(roasts["balanced"])
 
 @csrf_exempt
 def analyze_chai(request):

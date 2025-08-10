@@ -1,391 +1,840 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chai-O-Meter</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap">
-    <style>
-        :root {
-            --primary: #F59E0B;
-            --primary-dark: #D97706;
-            --secondary: #10B981;
-            --dark: #1F2937;
-            --light: #F3F4F6;
-            --white: #FFFFFF;
-        }
-        
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--light);
-            color: var(--dark);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            width: 100%;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        h1 {
-            color: var(--primary);
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .tagline {
-            color: var(--dark);
-            opacity: 0.8;
-            font-size: 1.1rem;
-        }
-        
-        .card {
-            background: var(--white);
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            margin-bottom: 1.5rem;
-            flex: 1;
-        }
-        
-        .step-indicator {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 1.5rem;
-            gap: 8px;
-        }
-        
-        .step {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-        }
-        
-        .step-active {
-            background: var(--primary);
-            color: var(--white);
-        }
-        
-        .step-inactive {
-            background: var(--light);
-            color: var(--dark);
-            opacity: 0.5;
-        }
-        
-        .step-completed {
-            background: var(--secondary);
-            color: var(--white);
-        }
-        
-        .video-container {
-            position: relative;
-            width: 100%;
-            max-width: 500px;
-            margin: 0 auto 1.5rem;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        
-        #video {
-            width: 100%;
-            height: auto;
-            display: block;
-            background: var(--light);
-        }
-        
-        .guide-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
-        }
-        
-        .guide-circle {
-            width: 70%;
-            height: 70%;
-            border: 2px dashed var(--primary);
-            border-radius: 50%;
-            opacity: 0.6;
-        }
-        
-        .button-group {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            margin-top: 1.5rem;
-            flex-wrap: wrap;
-        }
-        
-        .btn {
-            border: none;
-            padding: 12px 24px;
-            font-size: 1rem;
-            border-radius: 50px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s ease;
-        }
-        
-        .btn-primary {
-            background: var(--primary);
-            color: var(--white);
-        }
-        
-        .btn-primary:hover {
-            background: var(--primary-dark);
-        }
-        
-        .btn-outline {
-            background: transparent;
-            color: var(--primary);
-            border: 2px solid var(--primary);
-        }
-        
-        .btn-outline:hover {
-            background: rgba(245, 158, 11, 0.1);
-        }
-        
-        .btn-secondary {
-            background: var(--secondary);
-            color: var(--white);
-        }
-        
-        .btn-secondary:hover {
-            background: #0ea371;
-        }
-        
-        #side-section, #top-section {
-            display: none;
-        }
-        
-        #result-section {
-            display: none;
-        }
-        
-        .result-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-            margin-top: 1.5rem;
-        }
-        
-        .result-card {
-            background: var(--white);
-            border-radius: 12px;
-            padding: 1.5rem;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-        
-        .result-value {
-            font-size: 2.5rem;
-            font-weight: 600;
-            color: var(--primary);
-            margin: 0.5rem 0;
-        }
-        
-        .result-label {
-            font-size: 1rem;
-            color: var(--dark);
-            opacity: 0.8;
-        }
-        
-        .image-preview {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            margin-top: 1.5rem;
-        }
-        
-        .preview-container {
-            position: relative;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        .preview-image {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-        
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 2rem;
-        }
-        
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid rgba(245, 158, 11, 0.2);
-            border-radius: 50%;
-            border-top-color: var(--primary);
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--primary);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 50px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .toast.show {
-            opacity: 1;
-        }
-        
-        .instructions {
-            text-align: center;
-            margin-top: 1rem;
-            color: var(--dark);
-            opacity: 0.7;
-        }
-        
-        @media (max-width: 768px) {
-            .result-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .button-group {
-                flex-direction: column;
-            }
-            
-            .btn {
-                width: 100%;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chai-O-Meter | CodeForge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --chai-dark: #5C3D2E;
+      --chai-primary: #E67A00;
+      --chai-light: #F8EDD2;
+      --chai-cream: #FFF9E6;
+      --chai-accent: #FFA726;
+      --chai-milk: #FFF5E6;
+      --chai-spice: #E64A19;
+      --chai-shadow: 0 4px 20px rgba(92, 61, 46, 0.15);
+      --chai-shadow-lg: 0 8px 30px rgba(92, 61, 46, 0.25);
+      --chai-radius: 16px;
+      --chai-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --chai-texture: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxkZWZzPjxwYXR0ZXJuIGlkPSJwYXR0ZXJuIiB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHBhdHRlcm5UcmFuc2Zvcm09InJvdGF0ZSg0NSkiPjxyZWN0IHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgZmlsbD0icmdiYSgyNDUsMTY3LDM4LDAuMDMpIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI3BhdHRlcm4pIi8+PC9zdmc+');
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: var(--chai-cream);
+      background-image: var(--chai-texture);
+      color: var(--chai-dark);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.6;
+    }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, var(--chai-dark), var(--chai-primary));
+      color: white;
+      padding: 1.5rem 2rem;
+      box-shadow: var(--chai-shadow);
+      position: relative;
+      overflow: hidden;
+      z-index: 100;
+    }
+
+    header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -50%;
+      width: 100%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      transform: rotate(30deg);
+    }
+
+    .header-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      font-size: 2rem;
+      color: var(--chai-accent);
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .logo-text {
+      font-weight: 700;
+      font-size: 1.5rem;
+      background: linear-gradient(to right, var(--chai-accent), #FFD700);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .location {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      opacity: 0.9;
+      background: rgba(0,0,0,0.1);
+      padding: 0.5rem 0.8rem;
+      border-radius: 50px;
+      backdrop-filter: blur(5px);
+    }
+
+    .location i {
+      font-size: 1.1rem;
+      color: var(--chai-accent);
+    }
+
+    /* Main Content */
+    main {
+      flex: 1;
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Chai Card */
+    .chai-card {
+      background: white;
+      border-radius: var(--chai-radius);
+      padding: 2rem;
+      box-shadow: var(--chai-shadow);
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(92, 61, 46, 0.1);
+      background: linear-gradient(to bottom right, white, var(--chai-milk));
+    }
+
+    .chai-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 8px;
+      background: linear-gradient(90deg, var(--chai-primary), var(--chai-accent));
+    }
+
+    .card-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+
+    .card-header h2 {
+      color: var(--chai-primary);
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      position: relative;
+      display: inline-block;
+    }
+
+    .card-header h2::after {
+      content: '';
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 3px;
+      background: var(--chai-accent);
+      border-radius: 3px;
+    }
+
+    .card-header p {
+      color: var(--chai-dark);
+      opacity: 0.8;
+      font-size: 1rem;
+    }
+
+    /* Step Indicator */
+    .step-indicator {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+      position: relative;
+    }
+
+    .step-indicator::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--chai-light);
+      z-index: 1;
+    }
+
+    .step {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      position: relative;
+      z-index: 2;
+      transition: var(--chai-transition);
+      font-size: 1.1rem;
+    }
+
+    .step-active {
+      background: var(--chai-primary);
+      color: white;
+      box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+      transform: scale(1.1);
+    }
+
+    .step-inactive {
+      background: var(--chai-light);
+      color: var(--chai-dark);
+      opacity: 0.6;
+    }
+
+    .step-completed {
+      background: var(--chai-accent);
+      color: white;
+      box-shadow: 0 4px 12px rgba(255, 167, 38, 0.3);
+    }
+
+    /* Capture Sections */
+    .capture-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .section-title {
+      text-align: center;
+      color: var(--chai-primary);
+      font-size: 1.5rem;
+      font-weight: 500;
+      position: relative;
+      padding-bottom: 0.5rem;
+    }
+
+    .section-title::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 2px;
+      background: var(--chai-accent);
+    }
+
+    .video-container {
+      position: relative;
+      width: 100%;
+      max-width: 500px;
+      margin: 0 auto;
+      border-radius: var(--chai-radius);
+      overflow: hidden;
+      box-shadow: var(--chai-shadow-lg);
+      border: 2px solid white;
+    }
+
+    #video, #video-top {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: var(--chai-light);
+    }
+
+    .guide-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .guide-circle {
+      width: 80%;
+      height: 80%;
+      border: 3px dashed rgba(245, 158, 11, 0.7);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; transform: scale(0.98); }
+      50% { opacity: 0.9; transform: scale(1.02); }
+    }
+
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: none;
+      padding: 0.8rem 1.8rem;
+      font-size: 1rem;
+      border-radius: 50px;
+      cursor: pointer;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: var(--chai-transition);
+      box-shadow: 0 2px 8px rgba(91, 58, 41, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 5px;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.5);
+      opacity: 0;
+      border-radius: 100%;
+      transform: scale(1, 1) translate(-50%);
+      transform-origin: 50% 50%;
+    }
+
+    .btn:focus:not(:active)::after {
+      animation: ripple 0.6s ease-out;
+    }
+
+    @keyframes ripple {
+      0% {
+        transform: scale(0, 0);
+        opacity: 0.5;
+      }
+      100% {
+        transform: scale(20, 20);
+        opacity: 0;
+      }
+    }
+
+    .btn-primary {
+      background: var(--chai-primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--chai-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(91, 58, 41, 0.2);
+    }
+
+    .btn-outline {
+      background: white;
+      color: var(--chai-primary);
+      border: 2px solid var(--chai-primary);
+    }
+
+    .btn-outline:hover {
+      background: rgba(217, 119, 6, 0.1);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(91, 58, 41, 0.1);
+    }
+
+    .btn i {
+      font-size: 1.1rem;
+    }
+
+    .instructions {
+      text-align: center;
+      color: var(--chai-dark);
+      opacity: 0.8;
+      max-width: 500px;
+      margin: 0 auto;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    /* Result Section */
+    #result-section {
+      display: none;
+    }
+
+    .result-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .result-header h2 {
+      color: var(--chai-primary);
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .result-header p {
+      color: var(--chai-dark);
+      opacity: 0.8;
+      font-size: 1rem;
+    }
+
+    .result-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      box-shadow: var(--chai-shadow);
+      transition: var(--chai-transition);
+      border: 1px solid rgba(92, 61, 46, 0.1);
+      background: linear-gradient(to bottom right, white, var(--chai-milk));
+    }
+
+    .stat-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--chai-shadow-lg);
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--chai-primary);
+      margin: 0.5rem 0;
+      font-family: 'Dancing Script', cursive;
+    }
+
+    .stat-label {
+      font-size: 1rem;
+      color: var(--chai-dark);
+      opacity: 0.8;
+    }
+
+    .image-results {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .image-card {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: var(--chai-shadow);
+      transition: var(--chai-transition);
+      border: 1px solid rgba(92, 61, 46, 0.1);
+    }
+
+    .image-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--chai-shadow-lg);
+    }
+
+    .image-card img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .image-label {
+      padding: 1rem;
+      text-align: center;
+      font-weight: 500;
+      color: var(--chai-dark);
+      background: var(--chai-light);
+      border-top: 1px solid rgba(92, 61, 46, 0.1);
+    }
+
+    /* Loading */
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .loading-content {
+      max-width: 400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 5px solid rgba(217, 119, 6, 0.1);
+      border-radius: 50%;
+      border-top-color: var(--chai-primary);
+      animation: spin 1s linear infinite;
+    }
+
+    .loading-text {
+      font-size: 1.1rem;
+      color: var(--chai-dark);
+      font-weight: 500;
+    }
+
+    /* Chai Animation */
+    .chai-cup {
+      position: relative;
+      width: 100px;
+      height: 120px;
+      margin: 0 auto;
+    }
+
+    .cup {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 60px;
+      background: var(--chai-light);
+      border: 3px solid var(--chai-primary);
+      border-radius: 0 0 25px 25px;
+      overflow: hidden;
+    }
+
+    .cup::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to bottom, var(--chai-accent), transparent 70%);
+      opacity: 0.3;
+    }
+
+    .handle {
+      position: absolute;
+      right: -15px;
+      top: 20px;
+      width: 15px;
+      height: 30px;
+      border: 3px solid var(--chai-primary);
+      border-left: none;
+      border-radius: 0 15px 15px 0;
+    }
+
+    .steam {
+      position: absolute;
+      width: 8px;
+      height: 30px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      top: -35px;
+      left: 50%;
+      transform: translateX(-50%);
+      animation: steam 2s infinite;
+      filter: blur(1px);
+    }
+
+    .steam:nth-child(2) {
+      left: 40%;
+      animation-delay: 0.5s;
+    }
+
+    .steam:nth-child(3) {
+      left: 60%;
+      animation-delay: 1s;
+    }
+
+    @keyframes steam {
+      0% { transform: translateY(0) scaleY(1); opacity: 0.6; height: 20px; }
+      50% { transform: translateY(-25px) scaleY(1.5); opacity: 0.9; height: 30px; }
+      100% { transform: translateY(0) scaleY(1); opacity: 0.6; height: 20px; }
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--chai-primary);
+      color: white;
+      padding: 0.8rem 1.8rem;
+      border-radius: 50px;
+      box-shadow: var(--chai-shadow-lg);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transition: var(--chai-transition);
+      backdrop-filter: blur(5px);
+      background: rgba(230, 122, 0, 0.9);
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-10px);
+    }
+
+    .toast i {
+      font-size: 1.2rem;
+    }
+
+    /* Footer */
+    footer {
+      background: var(--chai-dark);
+      color: white;
+      padding: 1.5rem 2rem;
+      text-align: center;
+      margin-top: auto;
+      position: relative;
+    }
+
+    footer::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxkZWZzPjxwYXR0ZXJuIGlkPSJwYXR0ZXJuIiB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHBhdHRlcm5UcmFuc2Zvcm09InJvdGF0ZSg0NSkiPjxyZWN0IHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgZmlsbD0icmdiYSgwLDAsMCwwLjA1KSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNwYXR0ZXJuKSIvPjwvc3ZnPg==');
+    }
+
+    .footer-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 2;
+    }
+
+    .footer-text {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header-container {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+      }
+
+      .location {
+        justify-content: center;
+      }
+
+      .chai-card {
+        padding: 1.5rem;
+      }
+
+      .button-group {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .result-stats, .image-results {
+        grid-template-columns: 1fr;
+      }
+
+      .step {
+        width: 40px;
+        height: 40px;
+      }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Chai-O-Meter</h1>
-            <p class="tagline">Measure your chai like a pro</p>
-        </header>
-        
-        <div class="step-indicator">
-            <div id="step1" class="step step-active">1</div>
-            <div id="step2" class="step step-inactive">2</div>
-        </div>
-        
-        <div class="card" id="capture-section">
-            <h2 style="text-align: center; color: var(--primary); margin-bottom: 1rem;">Capture Side View</h2>
-            
-            <div class="video-container">
-                <video id="video" autoplay playsinline></video>
-                <div class="guide-overlay">
-                    <div class="guide-circle"></div>
-                </div>
-            </div>
-            
-            <div class="button-group">
-                <button id="capture-side-button" class="btn btn-primary">Capture</button>
-                <button id="upload-side-button" class="btn btn-outline">Upload</button>
-                <input type="file" id="file-input-side" accept="image/*" style="display:none;">
-            </div>
-            
-            <p class="instructions">Take a clear side view photo of your chai glass</p>
-        </div>
-        
-        <div class="card" id="top-section">
-            <h2 style="text-align: center; color: var(--primary); margin-bottom: 1rem;">Capture Top View</h2>
-            
-            <div class="video-container">
-                <video id="video-top" autoplay playsinline></video>
-                <div class="guide-overlay">
-                    <div class="guide-circle"></div>
-                </div>
-            </div>
-            
-            <div class="button-group">
-                <button id="capture-top-button" class="btn btn-primary">Capture</button>
-                <button id="upload-top-button" class="btn btn-outline">Upload</button>
-                <input type="file" id="file-input-top" accept="image/*" style="display:none;">
-            </div>
-            
-            <p class="instructions">Take a clear top-down photo of your chai froth</p>
-        </div>
-        
-        <div class="card" id="result-section">
-            <h2 style="text-align: center; color: var(--primary); margin-bottom: 1rem;">Your Chai Analysis</h2>
-            
-            <div class="result-grid">
-                <div class="result-card">
-                    <div class="result-value" id="chai-tsp">--</div>
-                    <div class="result-label">Teaspoons of Chai</div>
-                </div>
-                
-                <div class="result-card">
-                    <div class="result-value" id="bubble-count">--</div>
-                    <div class="result-label">Bubbles Detected</div>
-                </div>
-            </div>
-            
-            <div class="image-preview">
-                <div class="preview-container">
-                    <img id="side-preview" class="preview-image" alt="Side view analysis">
-                </div>
-                <div class="preview-container">
-                    <img id="top-preview" class="preview-image" alt="Top view analysis">
-                </div>
-            </div>
-            
-            <div class="button-group" style="margin-top: 2rem;">
-                <button id="analyze-again" class="btn btn-primary">Analyze Another Cup</button>
-            </div>
-        </div>
-        
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Analyzing your chai...</p>
-        </div>
+  <header>
+    <div class="header-container">
+      <div class="logo">
+        <i class="fas fa-mug-hot logo-icon"></i>
+        <span class="logo-text">Chai-O-Meter</span>
+      </div>
+      <div class="location">
+        <i class="fas fa-map-marker-alt"></i>
+        <span>College of Engineering Chengannur, Alappuzha, Kerala</span>
+      </div>
     </div>
-    
-    <div class="toast" id="toast"></div>
-    
-    <script src="static/app.js"></script>
+  </header>
+
+  <main>
+    <div class="app-container">
+      <div class="chai-card">
+        <div class="card-header">
+          <h2>Chai-O-Meter</h2>
+          <p>Precision measurement for your perfect chai</p>
+        </div>
+
+        <div class="step-indicator">
+          <div id="step1" class="step step-active">1</div>
+          <div id="step2" class="step step-inactive">2</div>
+        </div>
+
+        <div id="capture-section" class="capture-section">
+          <h3 class="section-title">Capture Side View</h3>
+
+          <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+            <div class="guide-overlay">
+              <div class="guide-circle"></div>
+            </div>
+          </div>
+
+          <div class="button-group">
+            <button id="capture-side-button" class="btn btn-primary">
+              <i class="fas fa-camera"></i> Capture
+            </button>
+            <button id="upload-side-button" class="btn btn-outline">
+              <i class="fas fa-upload"></i> Upload
+            </button>
+            <input type="file" id="file-input-side" accept="image/*" style="display:none;">
+          </div>
+          <p class="instructions">Position your chai glass in the circle and capture a clear side view photo</p>
+        </div>
+
+        <div id="top-section" class="capture-section" style="display:none;">
+          <h3 class="section-title">Capture Top View</h3>
+
+          <div class="video-container">
+            <video id="video-top" autoplay playsinline></video>
+            <div class="guide-overlay">
+              <div class="guide-circle"></div>
+            </div>
+          </div>
+
+          <div class="button-group">
+            <button id="capture-top-button" class="btn btn-primary">
+              <i class="fas fa-camera"></i> Capture
+            </button>
+            <button id="upload-top-button" class="btn btn-outline">
+              <i class="fas fa-upload"></i> Upload
+            </button>
+            <input type="file" id="file-input-top" accept="image/*" style="display:none;">
+          </div>
+
+          <p class="instructions">Now capture a clean top-down photo of your chai froth</p>
+        </div>
+
+        <div id="result-section">
+          <div class="result-header">
+            <h2>Your Chai Analysis</h2>
+            <p>Here's what we found in your perfect brew</p>
+            <div id="roast-message" style="text-align:center; color:var(--chai-spice); font-size:1.2rem; margin-bottom:1rem;"></div>
+          </div>
+
+          <div class="result-stats">
+            <div class="stat-card">
+              <div class="stat-value" id="chai-tsp">--</div>
+              <div class="stat-label">Teaspoons of Chai</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-value" id="bubble-count">--</div>
+              <div class="stat-label">Bubbles Detected</div>
+            </div>
+          </div>
+
+          <div class="image-results">
+            <div class="image-card">
+              <img id="side-preview" class="preview-image" alt="Side view analysis">
+              <div class="image-label">Chai Level Analysis</div>
+            </div>
+
+            <div class="image-card">
+              <img id="top-preview" class="preview-image" alt="Top view analysis">
+              <div class="image-label">Bubble Detection</div>
+            </div>
+          </div>
+
+          <div class="button-group" style="margin-top: 2rem;"> 
+            <button id="analyze-again" class="btn btn-primary">
+              <i class="fas fa-redo"></i> Analyze Another Cup
+            </button>
+          </div>
+        </div>
+
+        <div class="loading" id="loading">
+          <div class="loading-content">
+            <div class="spinner"></div>
+            <div class="chai-cup">
+              <div class="cup"></div>
+              <div class="handle"></div>
+              <div class="steam"></div>
+              <div class="steam"></div>
+              <div class="steam"></div>
+            </div>
+            <p class="loading-text">Brewing your analysis...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast">
+    <i class="fas fa-info-circle"></i>
+    <span id="toast-message"></span>
+  </div>
+
+  <footer>
+    <div class="footer-container">
+      <p class="footer-text">© 2023 Chai-O-Meter | College of Engineering Chengannur</p>
+    </div>
+  </footer>
+
+  <script src="static/app.js"></script>
 </body>
 </html>

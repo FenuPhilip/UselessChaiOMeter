@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const topPreviewEl = document.getElementById('top-preview');
     const loadingEl = document.getElementById('loading');
     const toastEl = document.getElementById('toast');
+    const toastMessage = document.getElementById('toast-message');
     const analyzeAgainBtn = document.getElementById('analyze-again');
     const step1Indicator = document.getElementById('step1');
     const step2Indicator = document.getElementById('step2');
@@ -27,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Toast helper
     function showToast(message, duration = 3000) {
-        toastEl.textContent = message;
+        toastMessage.textContent = message;
         toastEl.classList.add('show');
         
         clearTimeout(showToastTimeout);
@@ -47,8 +48,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 } 
             });
             videoSide.srcObject = stream;
-            captureSideButton.style.display = 'inline-block';
-            uploadSideButton.style.display = 'inline-block';
+            captureSideButton.style.display = 'inline-flex';
+            uploadSideButton.style.display = 'inline-flex';
         } catch (err) {
             console.error("Camera error:", err);
             captureSideButton.style.display = 'none';
@@ -65,8 +66,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 height: { ideal: 720 }
             });
             videoTop.srcObject = stream;
-            captureTopButton.style.display = 'inline-block';
-            uploadTopButton.style.display = 'inline-block';
+            captureTopButton.style.display = 'inline-flex';
+            uploadTopButton.style.display = 'inline-flex';
         } catch (err) {
             console.error("Camera error:", err);
             captureTopButton.style.display = 'none';
@@ -141,6 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
         // Start top camera
         startTopCamera();
+        showToast("Side view captured! Now take a top view of the froth");
     }
 
     // Analyze both images
@@ -156,7 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         topSection.style.display = 'none';
-        loadingEl.style.display = 'block';
+        loadingEl.style.display = 'flex';
         
         try {
             const response = await fetch('/analyze', {
@@ -188,6 +190,10 @@ document.addEventListener("DOMContentLoaded", () => {
         // Display simplified results in UI
         chaiTspEl.textContent = data.chai_teaspoons.toFixed(1);
         bubbleCountEl.textContent = data.bubble_count;
+        const roastMessageEl = document.getElementById('roast-message');
+        if (roastMessageEl && data.roast) {
+            roastMessageEl.textContent = data.roast;
+        }
         
         // Show annotated images if available
         if (data.annotated_side) {
@@ -209,6 +215,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         
         resultSection.style.display = 'block';
+        showToast("Analysis complete! Enjoy your chai!");
     }
 
     // Reset UI
